@@ -1,13 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { data } from '../assets/data';
 import QuestionCard from './QuestionCard';
 import ResultCard from './ResultCard';
 import QuestionNav from './QuestionNav';
 
+const STORAGE_KEY = 'exam_app_progress_v1';
+
+function getSavedProgress() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Quiz() {
-  const [index, setIndex] = useState(0);
-  const [userAnswers, setUserAnswers] = useState({});
-  const [isFinished, setIsFinished] = useState(false);
+  const saved = getSavedProgress();
+
+  // 1. Restore saved question index (safely bounded to data.length)
+  const [index, setIndex] = useState(() => {
+    if (
+      saved &&
+      typeof saved.index === 'number' &&
+      saved.index >= 0 &&
+      saved.index < data.length
+    ) {
+      return saved.index;
+    }
+    return 0;
+  });
+
+  // 2. Restore saved answers
+  const [userAnswers, setUserAnswers] = useState(() => {
+    return saved && typeof saved.userAnswers === 'object' && saved.userAnswers !== null
+      ? saved.userAnswers
+      : {};
+  });
+
+  // 3. Restore finished state
+  const [isFinished, setIsFinished] = useState(() => {
+    return Boolean(saved && saved.isFinished);
+  });
+
+  // 4. Save progress whenever index, userAnswers, or isFinished changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ index, userAnswers, isFinished })
+      );
+    } catch (err) {
+      console.error('Could not save quiz progress:', err);
+    }
+  }, [index, userAnswers, isFinished]);
 
   const currentQuestion = data[index];
   const selectedOption = userAnswers[index] ?? null;
@@ -51,7 +97,9 @@ export default function Quiz() {
     setIndex(targetIndex);
   };
 
+  // 5. Clear saved progress when restarting
   const handleRestart = () => {
+    localStorage.removeItem(STORAGE_KEY);
     setIndex(0);
     setUserAnswers({});
     setIsFinished(false);
